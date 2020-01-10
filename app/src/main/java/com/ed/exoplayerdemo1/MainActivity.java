@@ -45,9 +45,6 @@ public class MainActivity extends AppCompatActivity {
     private SimpleExoPlayerView mExoPlayerView;
     private SimpleExoPlayer mExoPlayer;
     private Context mContext;
-    //    Uri playerUri = Uri.parse("https://storage.googleapis.com/android-tv/Sample%20videos/Demo%20Slam/Google%20Demo%20Slam_%20Hangin'%20with%20the%20Google%20Search%20Bar.mp4");
-
-    private ProgressBar mProgressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,7 +54,6 @@ public class MainActivity extends AppCompatActivity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
         mContext = this;
-        mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
         initializePlayer();
         playVideo();
 
@@ -86,17 +82,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void playVideo() {
-
         ConcatenatingMediaSource videoSource = buildMediaSource();
-
-        //MediaSource在播放开始的时候，通过ExoPlayer.prepare方法注入
-        mExoPlayer.prepare(videoSource);
-        //添加监听的listener
-        //mExoPlayer.setVideoListener(mVideoListener);
-        mExoPlayer.addListener(eventListener);
-        //mExoPlayer.setTextOutput(mOutput);
-        mExoPlayer.setPlayWhenReady(true);
-
+        if(mExoPlayer!=null){
+            //MediaSource在播放开始的时候，通过ExoPlayer.prepare方法注入
+            mExoPlayer.prepare(videoSource);
+            //添加播放器监听的listener
+            mExoPlayer.addListener(eventListener);
+            mExoPlayer.setPlayWhenReady(true);
+        }else{
+            mExoPlayer.prepare(buildMediaSource(), false, false);
+            mExoPlayer.setPlayWhenReady(true);
+        }
     }
 
 
@@ -126,19 +122,6 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private SimpleExoPlayer.VideoListener mVideoListener = new SimpleExoPlayer.VideoListener() {
-        @Override
-        public void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
-            Log.i(TAG, "MainActivity.onVideoSizeChanged.width:" + width + ", height:" + height);
-
-        }
-
-        @Override
-        public void onRenderedFirstFrame() {
-            Log.i(TAG, "MainActivity.onRenderedFirstFrame.");
-        }
-    };
-
 
     private ExoPlayer.EventListener eventListener = new ExoPlayer.EventListener() {
         public void onTimelineChanged(Timeline timeline, Object manifest) {
@@ -167,14 +150,12 @@ public class MainActivity extends AppCompatActivity {
                     mExoPlayer.seekTo(0);
                     break;
                 case ExoPlayer.STATE_READY:
-                    mProgressBar.setVisibility(View.GONE);
                     Log.i(TAG, "ExoPlayer ready! pos: " + mExoPlayer.getCurrentPosition()
                             + " max: " + stringForTime((int) mExoPlayer.getDuration()));
                     setProgress(0);
                     break;
                 case ExoPlayer.STATE_BUFFERING:
                     Log.i(TAG, "Playback buffering!");
-                    mProgressBar.setVisibility(View.VISIBLE);
                     break;
                 case ExoPlayer.STATE_IDLE:
                     Log.i(TAG, "ExoPlayer idle!");
@@ -226,7 +207,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.i(TAG, "MainActivity.onResume.");
+        if(mExoPlayer !=null){
+            playVideo();
+        }
+    }
 
     @Override
     protected void onPause() {
@@ -242,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
         Log.i(TAG, "MainActivity.onStop.");
         super.onStop();
         if(mExoPlayer !=null){
-            mExoPlayer.release();
+            mExoPlayer.stop();
         }
 
 
@@ -252,9 +240,17 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if(mExoPlayer !=null){
-            mExoPlayer = null;
+            releasePlayer();
         }
 
+    }
+
+    private void releasePlayer() {
+        if (mExoPlayer != null) {
+            mExoPlayer.removeListener(eventListener);
+            mExoPlayer.release();
+            mExoPlayer = null;
+        }
     }
 }
 

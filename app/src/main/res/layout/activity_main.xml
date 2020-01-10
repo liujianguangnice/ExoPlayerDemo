@@ -4,20 +4,23 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    tools:context=".MainActivity"
+    android:background="@android:color/background_dark"
+    >
+
 
     <com.google.android.exoplayer2.ui.SimpleExoPlayerView
         android:id="@+id/exoView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            style="?android:attr/progressBarStyleLarge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone" />
-    </com.google.android.exoplayer2.ui.SimpleExoPlayerView>
+        android:layout_height="match_parent"
+        android:layout_marginTop="63dp"
+        android:layout_marginBottom="63dp"
+        android:layout_marginLeft="100dp"
+        android:layout_marginRight="100dp"
+        app:show_timeout="10000"
+        app:fastforward_increment="3000"
+        app:rewind_increment="3000"
+        app:controller_layout_id="@layout/custom_playback_control"
+        ></com.google.android.exoplayer2.ui.SimpleExoPlayerView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
