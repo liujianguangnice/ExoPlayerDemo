@@ -54,15 +54,16 @@ public class MainActivity extends AppCompatActivity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
         mContext = this;
-        initializePlayer();
-        playVideo();
 
+        initPlayer();
+        sourceInjectPlayer();
+        setPlayPause(true);
     }
 
     /**
      * 初始化player
      */
-    private void initializePlayer() {
+    private void initPlayer() {
         if (mExoPlayerView == null) {
             //1. 创建一个默认的 TrackSelector,轨道选择器，用于选择MediaSource提供的轨道（tracks），供每个可用的渲染器使用。
             BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
@@ -78,25 +79,39 @@ public class MainActivity extends AppCompatActivity {
             mExoPlayerView = (SimpleExoPlayerView) findViewById(R.id.exoView);
             //4.为exoPlayerView设置播放器
             mExoPlayerView.setPlayer(mExoPlayer);
+
+            //添加播放器监听的listener
+            mExoPlayer.addListener(eventListener);
+            mExoPlayer.setPlayWhenReady(false);
         }
     }
 
-    private void playVideo() {
+    /**
+     * 加载MediaSource数据
+     */
+    private void sourceInjectPlayer() {
         ConcatenatingMediaSource videoSource = buildMediaSource();
         if (mExoPlayer != null) {
             //MediaSource在播放开始的时候，通过ExoPlayer.prepare方法注入
             mExoPlayer.prepare(videoSource);
-            //添加播放器监听的listener
-            mExoPlayer.addListener(eventListener);
-            mExoPlayer.setPlayWhenReady(true);
-        } else {
-            mExoPlayer.prepare(buildMediaSource(), false, false);
-            mExoPlayer.setPlayWhenReady(true);
         }
     }
 
+    /**
+     * 播放或停止播放器
+     */
+    private void setPlayPause(boolean play) {
+        if (mExoPlayer != null) {
+            mExoPlayer.setPlayWhenReady(play);
+        }
 
-    /*可以传递多个资源*/
+    }
+
+
+    /**
+     * 创建多媒体资源，可以传递多个资源，
+     * 可以是不同类型的数据，如视屏、音频
+     */
     private ConcatenatingMediaSource buildMediaSource() {
         Uri uri = Uri.parse(
                 "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
@@ -122,7 +137,9 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-
+    /**
+     * 播放器监听器
+     */
     private ExoPlayer.EventListener eventListener = new ExoPlayer.EventListener() {
         public void onTimelineChanged(Timeline timeline, Object manifest) {
             Log.i(TAG, "onTimelineChanged");
@@ -130,18 +147,18 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-            Log.i(TAG, "onTracksChanged");
+            Log.i(TAG, "onTracksChanged:播放器轨道选择器切换...");
         }
 
         @Override
         public void onLoadingChanged(boolean isLoading) {
-            Log.i(TAG, "onLoadingChanged");
+            Log.i(TAG, "onLoadingChanged:播放器正在加载中...");
         }
 
         @Override
         public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
-            Log.i(TAG, "onPlayerStateChanged: playWhenReady = " + String.valueOf(playWhenReady)
-                    + " playbackState = " + playbackState);
+            Log.i(TAG, "onPlayerStateChanged播放状态变化中: 准备工作完成是否播放 = " + String.valueOf(playWhenReady)
+                    + " 当前播放器状态 = " + playbackState);
             switch (playbackState) {
                 case ExoPlayer.STATE_ENDED:
                     Log.i(TAG, "Playback ended!");
@@ -150,7 +167,7 @@ public class MainActivity extends AppCompatActivity {
                     mExoPlayer.seekTo(0);
                     break;
                 case ExoPlayer.STATE_READY:
-                    Log.i(TAG, "ExoPlayer ready! pos: " + mExoPlayer.getCurrentPosition()
+                    Log.i(TAG, "播放器准备完毕! pos: " + mExoPlayer.getCurrentPosition()
                             + " max: " + stringForTime((int) mExoPlayer.getDuration()));
                     setProgress(0);
                     break;
@@ -179,17 +196,8 @@ public class MainActivity extends AppCompatActivity {
     };
 
     /**
-     * Starts or stops playback. Also takes care of the Play/Pause button toggling
-     *
-     * @param play True if playback should be started
+     * 时间格式化
      */
-    private void setPlayPause(boolean play) {
-        if (mExoPlayer != null) {
-            mExoPlayer.setPlayWhenReady(play);
-        }
-
-    }
-
     private String stringForTime(int timeMs) {
         StringBuilder mFormatBuilder;
         Formatter mFormatter;
@@ -205,7 +213,8 @@ public class MainActivity extends AppCompatActivity {
         if (hours > 0) {
             return mFormatter.format("%d:%02d:%02d", hours, minutes, seconds).toString();
         } else {
-            return mFormatter.format("%02d:%02d", minutes, seconds).toString();
+            return mFormatter.format("%d:%02d:%02d", hours, minutes, seconds).toString();
+            //return mFormatter.format("%02d:%02d", minutes, seconds).toString();
         }
     }
 
@@ -213,7 +222,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        Log.i(TAG, "MainActivity.onResume.");
+        Log.i(TAG, "onResume.");
         if (mExoPlayer != null) {
             setPlayPause(true);
         }
@@ -221,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
-        Log.i(TAG, "MainActivity.onPause.");
+        Log.i(TAG, "onPause.");
         super.onPause();
         if (mExoPlayer != null) {
             setPlayPause(false);
@@ -230,7 +239,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-        Log.i(TAG, "MainActivity.onStop.");
+        Log.i(TAG, "onStop.");
         super.onStop();
         if (mExoPlayer != null) {
             setPlayPause(false);
@@ -245,7 +254,6 @@ public class MainActivity extends AppCompatActivity {
         if (mExoPlayer != null) {
             releasePlayer();
         }
-
     }
 
     private void releasePlayer() {
