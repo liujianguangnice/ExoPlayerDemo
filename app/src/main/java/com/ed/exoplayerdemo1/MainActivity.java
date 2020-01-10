@@ -8,10 +8,12 @@ import android.os.Bundle;
 import android.view.Window;
 import android.view.WindowManager;
 
+import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
+import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
@@ -25,7 +27,9 @@ import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.LoopingMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.MergingMediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
+import com.google.android.exoplayer2.source.SingleSampleMediaSource;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
@@ -42,6 +46,7 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
 import com.google.android.exoplayer2.util.EventLogger;
 import com.google.android.exoplayer2.util.Log;
+import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.VideoListener;
 
@@ -53,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
     private final String TAG = this.getClass().getSimpleName();
     private SimpleExoPlayerView mExoPlayerView;
     private SimpleExoPlayer mExoPlayer;
-    private Context mContext;
+    private Context context;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
-        mContext = this;
+        context = this;
 
         initPlayer();
         sourceInjectPlayer();
@@ -165,6 +170,18 @@ public class MainActivity extends AppCompatActivity {
                 null, null);
         return new ConcatenatingMediaSource(videoSource);
 
+
+
+       /* 播放序列（A，A，B）
+       MediaSource firstSource =
+                new ProgressiveMediaSource.Factory(...).createMediaSource(firstVideoUri);
+        MediaSource secondSource =
+                new ProgressiveMediaSource.Factory(...).createMediaSource(secondVideoUri);
+        // Plays the first video twice.
+        LoopingMediaSource firstSourceTwice = new LoopingMediaSource(firstSource, 2);
+        // Plays the first video twice, then the second video.
+        ConcatenatingMediaSource concatenatedSource =
+                new ConcatenatingMediaSource(firstSourceTwice, secondSource);*/
     }
 
 
@@ -176,16 +193,11 @@ public class MainActivity extends AppCompatActivity {
         Uri uri = Uri.parse(
                 "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
 
-        //测量播放过程中的带宽。 如果不需要，可以为null。自适应流的核心就是选择最合适当前播放环境的轨道,自适应播放根据测量的下载速度来估计网络带宽
-        DefaultBandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
-        // 生成加载媒体数据的DataSource实例。
-        DataSource.Factory dataSourceFactory
-                = new DefaultDataSourceFactory(this,
-                Util.getUserAgent(this, "useExoplayer"), bandwidthMeter);
-        // 生成用于解析媒体数据的Extractor实例。
-        ExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
-        MediaSource videoSource = new ExtractorMediaSource(uri, dataSourceFactory, extractorsFactory,
-                null, null);
+        DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context,
+                Util.getUserAgent(context, getApplicationInfo().name));
+        MediaSource videoSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(uri);
+
         // Clip to start at 5 seconds and end at 10 seconds.
         ClippingMediaSource clippingSource =
                 new ClippingMediaSource(
@@ -193,11 +205,35 @@ public class MainActivity extends AppCompatActivity {
                         /* startPositionUs= */ 5_000_000,
                         /* endPositionUs= */ 15_000_000);
 
-        // 控制播放的次数，前提是mExoPlayer.setRepeatMode不能做设置
+        // 控制播放的次数，前提是mExoPlayer.setRepeatMode不能做设置,无缝循环固定次数
         //LoopingMediaSource loopingSource = new LoopingMediaSource(clippingSource, 2);
         return clippingSource;
     }
 
+    /**
+    * 给定视频文件和单独的字幕文件， MergingMediaSource 可用于将它们合并为单个源以进行回放。
+    */
+    private void mergingMediaSource(){
+        Uri uri = Uri.parse(
+                "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
+        DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context,
+                Util.getUserAgent(context, getApplicationInfo().name));
+        MediaSource videoSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(uri);
+
+        // Build the subtitle MediaSource.
+       /* Format subtitleFormat = Format.createTextSampleFormat(
+                null, // An identifier for the track. May be null.
+                MimeTypes.APPLICATION_SUBRIP, // The mime type. Must be set correctly.
+                null, // Selection flags for the track.
+                null); // The subtitle language. May be null.
+        MediaSource subtitleSource =
+                new ProgressiveMediaSource.Factory(dataSourceFactory)
+	        .createMediaSource(subtitleUri, subtitleFormat, C.TIME_UNSET);
+        // Plays the video with the sideloaded subtitle.
+        MergingMediaSource mergedSource =
+                new MergingMediaSource(videoSource, subtitleSource);*/
+    }
 
     /**
      * 播放器监听器
