@@ -83,13 +83,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void playVideo() {
         ConcatenatingMediaSource videoSource = buildMediaSource();
-        if(mExoPlayer!=null){
+        if (mExoPlayer != null) {
             //MediaSource在播放开始的时候，通过ExoPlayer.prepare方法注入
             mExoPlayer.prepare(videoSource);
             //添加播放器监听的listener
             mExoPlayer.addListener(eventListener);
             mExoPlayer.setPlayWhenReady(true);
-        }else{
+        } else {
             mExoPlayer.prepare(buildMediaSource(), false, false);
             mExoPlayer.setPlayWhenReady(true);
         }
@@ -99,7 +99,7 @@ public class MainActivity extends AppCompatActivity {
     /*可以传递多个资源*/
     private ConcatenatingMediaSource buildMediaSource() {
         Uri uri = Uri.parse(
-                    "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
+                "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
         Uri uri1 = Uri.parse(
                 "http://vfx.mtime.cn/Video/2019/03/21/mp4/190321153853126488.mp4");
 
@@ -118,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
 
         MediaSource videoSource1 = new ExtractorMediaSource(uri1, dataSourceFactory, extractorsFactory,
                 null, null);
-        return new ConcatenatingMediaSource(videoSource,videoSource1);
+        return new ConcatenatingMediaSource(videoSource, videoSource1);
 
     }
 
@@ -184,7 +184,10 @@ public class MainActivity extends AppCompatActivity {
      * @param play True if playback should be started
      */
     private void setPlayPause(boolean play) {
-        mExoPlayer.setPlayWhenReady(play);
+        if (mExoPlayer != null) {
+            mExoPlayer.setPlayWhenReady(play);
+        }
+
     }
 
     private String stringForTime(int timeMs) {
@@ -211,8 +214,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         Log.i(TAG, "MainActivity.onResume.");
-        if(mExoPlayer !=null){
-            playVideo();
+        if (mExoPlayer != null) {
+            setPlayPause(true);
         }
     }
 
@@ -220,8 +223,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         Log.i(TAG, "MainActivity.onPause.");
         super.onPause();
-        if(mExoPlayer !=null){
-            mExoPlayer.stop();
+        if (mExoPlayer != null) {
+            setPlayPause(false);
         }
     }
 
@@ -229,8 +232,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
         Log.i(TAG, "MainActivity.onStop.");
         super.onStop();
-        if(mExoPlayer !=null){
-            mExoPlayer.stop();
+        if (mExoPlayer != null) {
+            setPlayPause(false);
         }
 
 
@@ -239,7 +242,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if(mExoPlayer !=null){
+        if (mExoPlayer != null) {
             releasePlayer();
         }
 
@@ -247,6 +250,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void releasePlayer() {
         if (mExoPlayer != null) {
+            mExoPlayer.stop();
             mExoPlayer.removeListener(eventListener);
             mExoPlayer.release();
             mExoPlayer = null;
