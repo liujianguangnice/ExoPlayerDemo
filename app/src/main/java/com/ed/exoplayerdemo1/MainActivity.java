@@ -5,8 +5,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ImageView;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
@@ -22,6 +24,7 @@ import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.extractor.ExtractorsFactory;
+import com.google.android.exoplayer2.metadata.Metadata;
 import com.google.android.exoplayer2.source.ClippingMediaSource;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
@@ -54,11 +57,14 @@ import java.io.IOException;
 import java.util.Formatter;
 import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private final String TAG = this.getClass().getSimpleName();
     private SimpleExoPlayerView mExoPlayerView;
     private SimpleExoPlayer mExoPlayer;
     private Context context;
+    private ImageView allScreen;
+
+    private ConcatenatingMediaSource videoSource;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,9 +75,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         context = this;
 
+        initView();
+
         initPlayer();
         sourceInjectPlayer();
         setPlayOrPause(true);
+    }
+
+    private void initView() {
+        allScreen = findViewById(R.id.exo_all_screen);
+        allScreen.setOnClickListener(this);
     }
 
     /**
@@ -79,26 +92,29 @@ public class MainActivity extends AppCompatActivity {
      */
     private void initPlayer() {
         if (mExoPlayerView == null) {
-            //1. 创建一个默认的 TrackSelector,轨道选择器，用于选择MediaSource提供的轨道（tracks），供每个可用的渲染器使用。
+            //创建带宽
             BandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
+            //创建轨道选择工厂
             TrackSelection.Factory videoTackSelectionFactory =
                     new AdaptiveTrackSelection.Factory(bandwidthMeter);
+            //创建缓冲控制器，用于控制MediaSource何时缓冲更多的媒体资源以及缓冲多少媒体资源
+            LoadControl loadControl = new DefaultLoadControl();
+            //1. 创建轨道选择器，从MediaSource中提取各个轨道的二进制数据，交给Render渲染。
             MappingTrackSelector trackSelector =
                     new DefaultTrackSelector(videoTackSelectionFactory);
-            //用于控制MediaSource何时缓冲更多的媒体资源以及缓冲多少媒体资源,在创建播放器的时候被注入
-            LoadControl loadControl = new DefaultLoadControl();
-            //2.创建ExoPlayer
+
+            //2.创建播放器实例
             mExoPlayer = ExoPlayerFactory.newSimpleInstance(this, trackSelector, loadControl);
             //3.创建SimpleExoPlayerView
             mExoPlayerView = (SimpleExoPlayerView) findViewById(R.id.exoView);
-            //4.为exoPlayerView设置播放器
+            //4.将player和view绑定
             mExoPlayerView.setPlayer(mExoPlayer);
 
             //添加播放器监听的listener
             mExoPlayer.addListener(eventListener);
             mExoPlayer.addVideoListener(videoListener);
-            //控制媒体是否以及如何循环,也可以通过媒体资源控制循环次数
-            mExoPlayer.setRepeatMode(Player.REPEAT_MODE_ONE);
+            //控制媒体是否以及如何循环,也可以通过媒体资源控制循环次数,REPEAT_MODE_ONE单个资源无限播放（两个资源只重复播放第一个），
+            mExoPlayer.setRepeatMode(Player.REPEAT_MODE_ALL);
             //控制播放列表改组
             mExoPlayer.setShuffleModeEnabled(false);
             //调整播放速度和音高setPlaybackParameters
@@ -124,10 +140,9 @@ public class MainActivity extends AppCompatActivity {
      * 加载MediaSource数据
      */
     private void sourceInjectPlayer() {
-        //ConcatenatingMediaSource videoSource = buildMediaSource();
-        MediaSource videoSource = clippingMediaSource();
+        videoSource = buildConcatenatingMediaSource();
         if (mExoPlayer != null) {
-            //MediaSource在播放开始的时候，通过ExoPlayer.prepare方法注入
+            //添加数据源到播放器中
             mExoPlayer.prepare(videoSource);
         }
     }
@@ -137,6 +152,7 @@ public class MainActivity extends AppCompatActivity {
      */
     private void setPlayOrPause(boolean play) {
         if (mExoPlayer != null) {
+            //开始播放
             mExoPlayer.setPlayWhenReady(play);
         }
 
@@ -144,10 +160,27 @@ public class MainActivity extends AppCompatActivity {
 
 
     /**
-     * 创建多媒体资源，可以传递多个资源，
+     * 创建单个多媒体资源，可以传递不同类型的数据，如视屏、音频
+     */
+    private MediaSource buildMediaSource() {
+        Uri uri = Uri.parse(
+                "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
+
+        //创建加载数据的工厂
+        DataSource.Factory dataSourceFactory= new DefaultDataSourceFactory(this,
+                Util.getUserAgent(this, getApplicationInfo().name));
+        // MediaSource代表要播放的媒体,可以是本地资源，可以是网络资源
+        MediaSource videoSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                .setTag(uri)
+                .createMediaSource(uri);
+        return videoSource;
+    }
+
+    /**
+     * 创建多个媒体资源，可以传递多个资源，无缝播放
      * 可以是不同类型的数据，如视屏、音频
      */
-    private ConcatenatingMediaSource buildMediaSource() {
+    private ConcatenatingMediaSource buildConcatenatingMediaSource() {
         Uri uri = Uri.parse(
                 "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
         Uri uri1 = Uri.parse(
@@ -155,22 +188,18 @@ public class MainActivity extends AppCompatActivity {
 
         //测量播放过程中的带宽。 如果不需要，可以为null。自适应流的核心就是选择最合适当前播放环境的轨道,自适应播放根据测量的下载速度来估计网络带宽
         DefaultBandwidthMeter bandwidthMeter = new DefaultBandwidthMeter();
-        // 生成加载媒体数据的DataSource实例。
-        DataSource.Factory dataSourceFactory
-                = new DefaultDataSourceFactory(this,
-                Util.getUserAgent(this, "useExoplayer"), bandwidthMeter);
+        //创建加载数据的工厂
+        DataSource.Factory dataSourceFactory= new DefaultDataSourceFactory(this,
+                Util.getUserAgent(this, getApplicationInfo().name), bandwidthMeter);
         // 生成用于解析媒体数据的Extractor实例。
         ExtractorsFactory extractorsFactory = new DefaultExtractorsFactory();
-
         // MediaSource代表要播放的媒体,可以是本地资源，可以是网络资源
         MediaSource videoSource = new ExtractorMediaSource(uri, dataSourceFactory, extractorsFactory,
                 null, null);
 
         MediaSource videoSource1 = new ExtractorMediaSource(uri1, dataSourceFactory, extractorsFactory,
                 null, null);
-        return new ConcatenatingMediaSource(videoSource);
-
-
+        return new ConcatenatingMediaSource(videoSource,videoSource1);
 
        /* 播放序列（A，A，B）
        MediaSource firstSource =
@@ -189,12 +218,14 @@ public class MainActivity extends AppCompatActivity {
      * 剪辑某段视频
      * 示例将视频播放剪辑为以5秒开始并以10秒结束
      */
-    private MediaSource clippingMediaSource(){
+    private MediaSource clippingMediaSource() {
         Uri uri = Uri.parse(
                 "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
 
+        //创建加载数据的工厂
         DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context,
                 Util.getUserAgent(context, getApplicationInfo().name));
+        // 创建资源
         MediaSource videoSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(uri);
 
@@ -211,25 +242,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-    * 给定视频文件和单独的字幕文件， MergingMediaSource 可用于将它们合并为单个源以进行回放。
-    */
-    private void mergingMediaSource(){
+     * 给定视频文件和单独的字幕文件， MergingMediaSource 可用于将它们合并为单个源以进行回放。
+     */
+    private void mergingMediaSource() {
         Uri uri = Uri.parse(
                 "http://vfx.mtime.cn/Video/2019/02/04/mp4/190204084208765161.mp4");
         DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(context,
                 Util.getUserAgent(context, getApplicationInfo().name));
         MediaSource videoSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(uri);
-
+/*
         // Build the subtitle MediaSource.
-       /* Format subtitleFormat = Format.createTextSampleFormat(
+        Format subtitleFormat = Format.createTextSampleFormat(
                 null, // An identifier for the track. May be null.
                 MimeTypes.APPLICATION_SUBRIP, // The mime type. Must be set correctly.
                 null, // Selection flags for the track.
                 null); // The subtitle language. May be null.
         MediaSource subtitleSource =
                 new ProgressiveMediaSource.Factory(dataSourceFactory)
-	        .createMediaSource(subtitleUri, subtitleFormat, C.TIME_UNSET);
+                        .createMediaSource(subtitleUri, subtitleFormat, C.TIME_UNSET);
         // Plays the video with the sideloaded subtitle.
         MergingMediaSource mergedSource =
                 new MergingMediaSource(videoSource, subtitleSource);*/
@@ -239,9 +270,6 @@ public class MainActivity extends AppCompatActivity {
      * 播放器监听器
      */
     private ExoPlayer.EventListener eventListener = new ExoPlayer.EventListener() {
-        public void onTimelineChanged(Timeline timeline, Object manifest) {
-            Log.i(TAG, "onTimelineChanged");
-        }
 
         @Override
         public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
@@ -302,11 +330,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-
-        public void onPositionDiscontinuity() {
-            Log.i(TAG, "onPositionDiscontinuity");
-        }
-
         @Override
         public void onPlaybackParametersChanged(PlaybackParameters playbackParameters) {
             Log.i(TAG, "MainActivity.onPlaybackParametersChanged." + playbackParameters.toString());
@@ -399,6 +422,41 @@ public class MainActivity extends AppCompatActivity {
             mExoPlayer.removeListener(eventListener);
             mExoPlayer.release();
             mExoPlayer = null;
+        }
+    }
+
+    /**
+     * 修改播放器列表.如果当前播放 MediaSource 被移除，
+     * 则播放器将自动移动到播放第一个剩余的后继者,或者如果不存在这样的后继者则转换到结束状态
+     */
+    private void updateMediaSource(ConcatenatingMediaSource videoSource){
+        if(videoSource!=null&&videoSource.getSize()>0){
+             videoSource.removeMediaSource(0);
+        }
+    }
+
+
+    /**
+     * 识别播放列表项
+     * MediaSource 可以在工厂类中使用自定义标签设置每个项目 MediaSource ，这可以是uri，
+     * 标题或任何其他自定义对象。可以使用查询当前正在播放的项目的标签 player.getCurrentTag 。
+     * player.getCurrentTimeline 返回的当前值Timeline 还包含所有标记作为 Timeline.Window 对象的一部分
+     */
+    private void identifyMediaSource(MediaSource videoSource){
+        if(videoSource!=null&&mExoPlayer!=null){
+            //(Timeline)mExoPlayer.getCurrentTag();
+        }
+    }
+
+    @Override
+    public void onClick(View v) {
+        int i = v.getId();
+        switch (i) {
+            case R.id.exo_all_screen:
+                identifyMediaSource(videoSource);
+                break;
+
+            default:
         }
     }
 }

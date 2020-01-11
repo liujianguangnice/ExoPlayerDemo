@@ -55,7 +55,7 @@
             android:id="@id/exo_pause"
             android:layout_width="30dp"
             android:layout_height="30dp"
-            android:scaleType="fitCenter"
+            android:scaleType="fitXY"
             android:src="@drawable/exo_controls_pause_cus" />
 
         <TextView
@@ -86,6 +86,14 @@
             android:textColor="#ffffff"
             android:textSize="10sp"
             android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/exo_all_screen"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:scaleType="fitXY"
+            android:src="@drawable/exo_controls_all_screen"
+            ></ImageView>
 
     </LinearLayout>
 
